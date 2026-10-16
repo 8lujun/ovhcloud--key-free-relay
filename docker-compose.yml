@@ -1,0 +1,44 @@
+# OVHcloud 免密钥中转 —— docker compose 编排
+#
+#   docker compose up -d --build      # 构建并后台启动
+#   docker compose logs -f            # 看启动横幅和逐条请求日志
+#   docker compose down               # 停止并删除容器
+#
+# 默认只把端口绑在宿主机 127.0.0.1 上：只有这台机器能用，同网段设备用不了。
+# 要用手机/平板等局域网设备，见下面 ports 里的注释。
+#
+services:
+  ovh-relay:
+    build:
+      context: .
+    image: ovh-free-relay:1.4
+    container_name: ovh-free-relay
+    restart: unless-stopped
+    init: true
+
+    environment:
+      # 容器内的监听地址必须留在 0.0.0.0，否则端口映射进不来
+      OVH_RELAY_HOST: "0.0.0.0"
+      OVH_RELAY_PORT: "8787"
+      # 说明页上展示给客户端的地址。默认按监听地址推断成 http://127.0.0.1:8787/v1，
+      # 也就是说下面 ports 左边必须是 8787，页面上的地址才是对的。
+      # 想换宿主机端口（例如 8899:8787），或者要让局域网设备跟着填，就把它显式指出来：
+      # OVH_RELAY_PUBLIC_URL: "http://127.0.0.1:8899"
+      # OVH_RELAY_PUBLIC_URL: "http://192.168.1.10:8787"
+
+    ports:
+      # 只绑宿主机回环地址 —— 推荐保持这样
+      - "127.0.0.1:8787:8787"
+      # 要让同网段设备也能用，换成下面这行（等于把中转暴露给整个局域网）：
+      # - "8787:8787"
+
+    # 说明页/统计接口都在容器内可达，需要时从宿主机确认一下：
+    #   curl http://127.0.0.1:8787/health
+    #
+    # 想临时看上游原始报错（关闭参数自动矫正）：
+    #   command: ["python", "/app/src/ovh_free_proxy.py", "--strict-port", "--no-open", "--no-fix", "--debug"]
+    #
+    # 程序不写任何文件，所以不需要 volume；要更严一点可以加：
+    # read_only: true
+    # tmpfs:
+    #   - /tmp
